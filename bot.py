@@ -36,6 +36,8 @@ def main():
     with open("coins.json") as f:
         config = json.load(f)
 
+    send_telegram("✅ TEST ALERT: Bot is running correctly")
+
     threshold = config["alertThreshold"]
 
     for coin in config["coins"]:
@@ -61,7 +63,7 @@ def main():
                 f"Upper BB: {upper:.2f}\n"
                 f"Time: {time} UTC"
             )
-           send_telegram("✅ TEST ALERT: Bot is running correctly")
+           
 
 if __name__ == "__main__":
     main()
