@@ -2,7 +2,7 @@ import requests
 import statistics
 import time
 
-BINANCE_URL = "https://api.binance.com/api/v3/klines"
+BINANCE_URL = "https://data-api.binance.vision/api/v3/klines"
 
 # CONFIG
 PAIRS = [
