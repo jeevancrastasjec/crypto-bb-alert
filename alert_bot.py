@@ -1,10 +1,14 @@
 import requests
 import statistics
-import time
+import os
 
+# Binance public endpoint (NO KYC, works on GitHub Actions)
 BINANCE_URL = "https://data-api.binance.vision/api/v3/klines"
 
-# CONFIG
+# Telegram secrets (from GitHub Secrets)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
 PAIRS = [
     {"symbol": "BTCUSDT", "interval": "15m"},
     {"symbol": "SOLUSDT", "interval": "30m"}
@@ -14,42 +18,58 @@ BB_PERIOD = 20
 BB_STD_DEV = 2
 
 
+def send_telegram(message: str):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("❌ Telegram credentials missing")
+        return
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message
+    }
+
+    r = requests.post(url, json=payload, timeout=10)
+    if r.status_code != 200:
+        print("❌ Telegram error:", r.text)
+    else:
+        print("📨 Telegram alert sent")
+
+
 def fetch_closes(symbol, interval, limit=100):
     params = {
         "symbol": symbol,
         "interval": interval,
         "limit": limit
     }
-    response = requests.get(BINANCE_URL, params=params, timeout=10)
-    response.raise_for_status()
-    data = response.json()
-
-    closes = [float(candle[4]) for candle in data]
-    return closes
+    r = requests.get(BINANCE_URL, params=params, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    return [float(candle[4]) for candle in data]
 
 
-def calculate_bollinger_bands(closes):
+def calculate_upper_bb(closes):
     sma = statistics.mean(closes[-BB_PERIOD:])
     std = statistics.stdev(closes[-BB_PERIOD:])
-    upper_band = sma + (BB_STD_DEV * std)
-    lower_band = sma - (BB_STD_DEV * std)
-    return sma, upper_band, lower_band
+    return sma + (BB_STD_DEV * std)
 
 
 def check_pair(symbol, interval):
     closes = fetch_closes(symbol, interval)
-    last_price = closes[-1]
+    price = closes[-1]
+    upper_bb = calculate_upper_bb(closes)
 
-    sma, upper, lower = calculate_bollinger_bands(closes)
+    print(f"{symbol} ({interval}) → Price: {price}, Upper BB: {upper_bb:.2f}")
 
-    print(f"\n{symbol} | TF: {interval}")
-    print(f"Price: {last_price}")
-    print(f"Upper BB: {upper:.2f}")
-
-    if last_price >= upper:
-        print(f"🚨 ALERT: {symbol} touching UPPER Bollinger Band!")
-    else:
-        print("✅ No alert")
+    if price >= upper_bb:
+        message = (
+            f"🚨 BB ALERT\n"
+            f"Pair: {symbol}\n"
+            f"TF: {interval}\n"
+            f"Price: {price}\n"
+            f"Upper BB: {upper_bb:.2f}"
+        )
+        send_telegram(message)
 
 
 def main():
