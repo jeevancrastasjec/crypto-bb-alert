@@ -61,7 +61,7 @@ def main():
                 f"Upper BB: {upper:.2f}\n"
                 f"Time: {time} UTC"
             )
-            send_telegram(message)
+           send_telegram("✅ TEST ALERT: Bot is running correctly")
 
 if __name__ == "__main__":
     main()
