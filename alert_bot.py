@@ -1,60 +1,68 @@
-import requests
 import os
+import requests
 from datetime import datetime
 
-# Binance public endpoint (NO KYC)
-BINANCE_URL = "https://data-api.binance.vision/api/v3/klines"
-
-# Telegram secrets
+# ========================
+# TELEGRAM CONFIG
+# ========================
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 
-def send_telegram(message: str):
+def send_telegram(message):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("❌ Telegram credentials missing")
+        return
+
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "text": message
     }
-    r = requests.post(url, json=payload, timeout=10)
-    if r.status_code == 200:
-        print("📨 Telegram sent")
+
+    response = requests.post(url, json=payload)
+
+    if response.status_code != 200:
+        print("❌ Telegram error:", response.text)
     else:
-        print("❌ Telegram error:", r.text)
+        print("📨 Telegram sent")
 
 
-def fetch_price(symbol, interval):
-    params = {
-        "symbol": symbol,
-        "interval": interval,
-        "limit": 1
-    }
-    r = requests.get(BINANCE_URL, params=params, timeout=10)
+# ========================
+# BINANCE (PUBLIC API)
+# ========================
+def get_price(symbol):
+    url = "https://api.binance.com/api/v3/ticker/price"
+    params = {"symbol": symbol}
+
+    r = requests.get(url, params=params)
     r.raise_for_status()
-    data = r.json()
-    return float(data[-1][4])
+
+    return float(r.json()["price"])
 
 
+# ========================
+# MAIN LOGIC
+# ========================
 def main():
-    now = datetime.utcnow()
-    minute = now.minute
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-    # BTC → every 15 minutes
-    btc_price = fetch_price("BTCUSDT", "15m")
+    # BTC 15m
+    btc_price = get_price("BTCUSDT")
     send_telegram(
-        f"📊 BTC Update (15m)\n"
-        f"Price: {btc_price}\n"
-        f"Time (UTC): {now.strftime('%H:%M')}"
+        f"🟠 BTC Update (15m)\n"
+        f"Price: ${btc_price:,.2f}\n"
+        f"Time: {now}"
     )
 
-    # SOL → every 30 minutes (only on even 30 mins)
-    if minute % 30 == 0:
-        sol_price = fetch_price("SOLUSDT", "30m")
-        send_telegram(
-            f"📊 SOL Update (30m)\n"
-            f"Price: {sol_price}\n"
-            f"Time (UTC): {now.strftime('%H:%M')}"
-        )
+    # SOL 30m
+    sol_price = get_price("SOLUSDT")
+    send_telegram(
+        f"🟣 SOL Update (30m)\n"
+        f"Price: ${sol_price:,.2f}\n"
+        f"Time: {now}"
+    )
 
     print("✅ Run completed successfully")
 
